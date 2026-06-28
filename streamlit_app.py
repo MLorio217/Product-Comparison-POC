@@ -103,12 +103,9 @@ SKIP_SECTION_TERMS = [
     "other accidental death", "home modification", "vehicle modification",
 ]
 
-D_ONLY_ROWS = {12, 14, 15, 17, 18, 19, 20, 22}
+D_ONLY_ROWS = set()  # All rows writable in both D and H
 
 # Section header rows - never write values here
-HEADER_ROWS = {4, 5, 6, 24, 25, 47, 48, 77, 78, 92, 93, 120, 121, 131, 132, 140, 141, 148, 157}
-
-# Section header rows - never write benefit values here
 HEADER_ROWS = {4, 5, 6, 24, 25, 47, 48, 77, 78, 92, 93, 120, 121, 131, 132, 140, 141, 148, 157}
 
 # Rows that are text/plan design fields - never write dollar amounts here
@@ -152,9 +149,10 @@ def scan_acc_tab(template_bytes):
         lowered = name.lower()
         if any(skip in lowered for skip in SKIP_SECTION_TERMS):
             continue
-        benefit_map[name] = c_cell.row
+        if name not in benefit_map:  # First occurrence wins (lower row = more specific section)
+            benefit_map[name] = c_cell.row
 
-    return benefit_map, D_ONLY_ROWS, acc_sheet
+    return benefit_map, D_ONLY_ROWS
 
 # ─────────────────────────────────────────────
 # DYNAMIC MATCHER
@@ -197,7 +195,6 @@ TRANSLATIONS = {
     "follow up doctor":                 "follow-up doctor treatment",
     "fracture benefit":                 "chip fractures",
     "laceration benefit":               "laceration (sutures)",
-    "burn benefit":                     "burns (2nd degree, at least 36% of body)",
     "accident medical expense":         "outpatient surgery (once per accident)",
     "accidental death":                  "employee",
 }
@@ -208,7 +205,7 @@ def _normalize(text):
     text = str(text).lower().strip()
     for ch, rep in [("&"," and "),("/"," "),("-"," "),("("," "),(")"," "),("*"," ")]:
         text = text.replace(ch, rep)
-    text = re.sub(r"[^a-z0-9 ]", " ", text)
+    text = re.sub(r"[^a-z0-9% ]", " ", text)  # keep % for benefit distinctions
     text = re.sub(r"\s+", " ", text).strip()
     for word in REMOVE_WORDS:
         text = re.sub(rf"\b{re.escape(word)}\b", " ", text)
@@ -292,9 +289,6 @@ def write_workbook(template_bytes, voya_benefits, competitor_benefits, benefit_m
                 skipped.append((name, value, col, f"Row {row} is D-only"))
                 continue
             if row in HEADER_ROWS:
-                skipped.append((name, value, col, f"Row {row} is a section header - not writable"))
-                continue
-            if row in HEADER_ROWS:
                 skipped.append((name, value, col, f"Row {row} is a section header"))
                 continue
             if row in TEXT_ONLY_ROWS:
@@ -363,8 +357,8 @@ if st.button("Generate Completed Comparison", type="primary", use_container_widt
             template_bytes = template_file.read()
 
             st.write("📋 Scanning template for benefit rows...")
-            benefit_map, d_only_rows, acc_sheet = scan_acc_tab(template_bytes)
-            st.write(f"✅ Template: {len(benefit_map)} benefit rows found in **{acc_sheet}**")
+            benefit_map, d_only_rows = scan_acc_tab(template_bytes)
+            st.write(f"✅ Template: {len(benefit_map)} benefit rows found")
 
             st.write("📄 Reading Voya PDF...")
             voya_raw = extract_benefits(voya_file.read())
