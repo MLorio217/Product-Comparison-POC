@@ -105,6 +105,15 @@ SKIP_SECTION_TERMS = [
 
 D_ONLY_ROWS = {12, 14, 15, 17, 18, 19, 20, 22}
 
+# Rows that are text/plan design fields - never write dollar amounts here
+TEXT_ONLY_ROWS = {151, 153, 154, 155}
+
+# Rows that are monthly rates - only write if value looks like a real rate (under $500)
+RATE_ROWS = {158, 159, 160, 161, 164, 165, 166}
+
+# Maximum reasonable ACC benefit amount - anything over this is likely a parsing error
+MAX_BENEFIT = 200000  # Allows Catastrophic Rider ($100k+) but blocks clearly wrong values
+
 def scan_acc_tab(template_bytes):
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp.write(template_bytes)
@@ -277,6 +286,15 @@ def write_workbook(template_bytes, voya_benefits, competitor_benefits, benefit_m
                 continue
             if col == "H" and row in d_only_rows:
                 skipped.append((name, value, col, f"Row {row} is D-only"))
+                continue
+            if row in TEXT_ONLY_ROWS:
+                skipped.append((name, value, col, f"Row {row} is a text field - no dollar amount written"))
+                continue
+            if isinstance(value, (int, float)) and value > MAX_BENEFIT:
+                skipped.append((name, value, col, f"Value {value} exceeds max reasonable benefit - likely parsing error"))
+                continue
+            if row in RATE_ROWS and isinstance(value, (int, float)) and value > 500:
+                skipped.append((name, value, col, f"Value {value} too large for rate row {row}"))
                 continue
             used.add(row)
             ws[f"{col}{row}"] = value
