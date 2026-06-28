@@ -105,6 +105,12 @@ SKIP_SECTION_TERMS = [
 
 D_ONLY_ROWS = {12, 14, 15, 17, 18, 19, 20, 22}
 
+# Section header rows - never write values here
+HEADER_ROWS = {4, 5, 6, 24, 25, 47, 48, 77, 78, 92, 93, 120, 121, 131, 132, 140, 141, 148, 157}
+
+# Section header rows - never write benefit values here
+HEADER_ROWS = {4, 5, 6, 24, 25, 47, 48, 77, 78, 92, 93, 120, 121, 131, 132, 140, 141, 148, 157}
+
 # Rows that are text/plan design fields - never write dollar amounts here
 TEXT_ONLY_ROWS = {151, 153, 154, 155}
 
@@ -189,13 +195,11 @@ TRANSLATIONS = {
     "rehabilitation facility":          "rehabilitation facility confinement (per day up to 90 days)",
     "physician follow-up visit":        "follow-up doctor treatment",
     "follow up doctor":                 "follow-up doctor treatment",
-    "fracture benefit":                 "hip",
-    "fracture":                         "hip",
+    "fracture benefit":                 "chip fractures",
     "laceration benefit":               "laceration (sutures)",
     "burn benefit":                     "burns (2nd degree, at least 36% of body)",
-    "burns":                            "burns (2nd degree, at least 36% of body)",
-    "accidental death":                 "employee",
     "accident medical expense":         "outpatient surgery (once per accident)",
+    "accidental death":                  "employee",
 }
 
 REMOVE_WORDS = ["benefit","benefits","per","day","days","up to","maximum","max","coverage","covered","treatment","level"]
@@ -286,6 +290,12 @@ def write_workbook(template_bytes, voya_benefits, competitor_benefits, benefit_m
                 continue
             if col == "H" and row in d_only_rows:
                 skipped.append((name, value, col, f"Row {row} is D-only"))
+                continue
+            if row in HEADER_ROWS:
+                skipped.append((name, value, col, f"Row {row} is a section header - not writable"))
+                continue
+            if row in HEADER_ROWS:
+                skipped.append((name, value, col, f"Row {row} is a section header"))
                 continue
             if row in TEXT_ONLY_ROWS:
                 skipped.append((name, value, col, f"Row {row} is a text field - no dollar amount written"))
